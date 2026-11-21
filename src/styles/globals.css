@@ -1,0 +1,230 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Class-based dark mode (next-themes puts .dark on <html>); the default would follow the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Vexora Labs design tokens — see CLAUDE.md §4 */
+
+@theme inline {
+  --color-success-text: var(--success-text);
+  --color-warning-text: var(--warning-text);
+  --color-info-text: var(--info-text);
+  --color-violet: var(--violet);
+  --color-violet-text: var(--violet-text);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-paper: var(--paper);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-inter);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f766e;
+  --primary-hover: #0d6d64;
+  --primary-light: #ccfbf1;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0f766e;
+  --chart-1: #0f766e;
+  --chart-2: #3b82f6;
+  --chart-3: #f59e0b;
+  --chart-4: #10b981;
+  --chart-5: #64748b;
+  --radius: 0.5rem;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-muted: #94a3b8;
+  --sidebar-primary: #0f766e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #0f766e;
+  /* Status text on tinted badges (Tailwind 700 shades in light mode). */
+  --success-text: #047857;
+  --warning-text: #b45309;
+  --info-text: #1d4ed8;
+  --violet: #8b5cf6;
+  --violet-text: #6d28d9;
+  /* Chart series — validated categorical palette (dataviz validator) per theme. */
+  --series-1: #0d9488;
+  --series-2: #2a78d6;
+  /* Logo/signature previews: white in both themes, like the printed page they're for. */
+  --paper: #ffffff;
+  --gold: #b8860b;
+  --gold-light: #fff8e7;
+  color-scheme: light;
+}
+
+/* Obsidian + Teal */
+.dark {
+  --background: #0b0d11;
+  --foreground: #e8eaf0;
+  --card: #13151c;
+  --card-foreground: #e8eaf0;
+  --popover: #13151c;
+  --popover-foreground: #e8eaf0;
+  --primary: #2dd4bf;
+  --primary-hover: #26bca8;
+  --primary-light: #0b3b36;
+  --primary-foreground: #0b0d11;
+  --secondary: #1a1c25;
+  --secondary-foreground: #e8eaf0;
+  --muted: #1a1c25;
+  --muted-foreground: #8b8fa3;
+  --accent: #1a1c25;
+  --accent-foreground: #e8eaf0;
+  --destructive: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --info: #60a5fa;
+  --text-secondary: #8b8fa3;
+  /* Spec palette had #555870 (2.6:1 on cards); lifted to reach 3:1 on every dark surface. */
+  --text-muted: #686c84;
+  --border: #1e2130;
+  --input: #1e2130;
+  --ring: #2dd4bf;
+  --chart-1: #2dd4bf;
+  --chart-2: #60a5fa;
+  --chart-3: #fbbf24;
+  --chart-4: #34d399;
+  --chart-5: #8b8fa3;
+  --sidebar: #090a0e;
+  --sidebar-foreground: #c8cad4;
+  --sidebar-muted: #686c84;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #090a0e;
+  --sidebar-accent: #14161e;
+  --sidebar-accent-foreground: #e8eaf0;
+  --sidebar-border: #1e2130;
+  --sidebar-ring: #2dd4bf;
+  --success-text: #34d399;
+  --warning-text: #fbbf24;
+  --info-text: #60a5fa;
+  --violet: #a78bfa;
+  --violet-text: #c4b5fd;
+  --series-1: #1ba898;
+  --series-2: #4a8ae6;
+  --gold: #d4a853;
+  --gold-light: #1a1510;
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/*
+ * Theme switch = one compositor cross-fade of the whole page (ThemeToggle wraps the change in
+ * document.startViewTransition). No per-element colour transitions; hover/focus transitions stay
+ * on the interactive elements themselves (transition-colors etc.).
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.25s;
+  animation-timing-function: ease-in-out;
+}
+
+.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #13151c;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #2a2d3a;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3a3d4a;
+}
+
+/* SweetAlert2 dark: its theme option styles the popup; keep buttons readable on the bright teal. */
+.dark .swal2-popup .swal2-styled.swal2-confirm {
+  color: var(--primary-foreground);
+}
+.dark .swal2-popup .swal2-textarea,
+.dark .swal2-popup .swal2-input {
+  background: var(--background);
+  border-color: var(--border);
+  color: var(--foreground);
+}
