@@ -1,0 +1,94 @@
+name: CI/CD — Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOCKER_IMAGE: medicine-agent-web
+  DEPLOY_PATH: /opt/medicine-agent
+
+jobs:
+  # ─── Job 1: Lint & Type Check ───
+  check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type Check
+        run: npm run typecheck
+
+  # ─── Job 2: Build & Deploy ───
+  deploy:
+    name: Build & Deploy
+    needs: check
+    runs-on: ubuntu-latest
+    # Only deploy on push to main (not on PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} \
+            -t ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+            -t ${{ env.DOCKER_IMAGE }}:latest \
+            .
+
+      - name: Save Docker image
+        run: docker save ${{ env.DOCKER_IMAGE }}:latest | gzip > image.tar.gz
+
+      - name: Copy image to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: image.tar.gz
+          target: ${{ env.DEPLOY_PATH }}
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ${{ env.DEPLOY_PATH }}
+
+            # Load the new image
+            docker load < image.tar.gz
+
+            # Stop the old container (if running)
+            docker stop medicine-agent-web 2>/dev/null || true
+            docker rm medicine-agent-web 2>/dev/null || true
+
+            # Start new container with server-side env vars
+            docker run -d \
+              --name medicine-agent-web \
+              --restart always \
+              -p 3000:3000 \
+              --env-file ${{ env.DEPLOY_PATH }}/.env.production \
+              ${{ env.DOCKER_IMAGE }}:latest
+
+            # Clean up
+            rm -f image.tar.gz
+            docker image prune -f
+
+            echo "✅ Deployed successfully"

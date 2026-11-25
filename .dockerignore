@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+audit/
+claude-code-prompt-*.md
+quotation-pi-invoice-redesign-prompt.md
+Medicine_Agent_Web_QA.xlsx
+MASTER_PROMPT.md
+*.md
+!README.md
+.claude/
+.mcp.json
+skills-lock.json
