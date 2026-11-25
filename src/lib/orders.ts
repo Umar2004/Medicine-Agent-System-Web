@@ -27,6 +27,7 @@ import {
 import { centsToDecimal, lineTotalCents } from "@/lib/money";
 import { lastQuotedPrice } from "@/lib/quotations";
 import { emptyToNull, type DocumentInput } from "@/lib/validations";
+import type { PartyFieldsInput } from "@/lib/validations/orders";
 
 /** Sidebar pages whose users may read PI/order data (read access = sidebar visibility). */
 export const ORDER_READ_ROUTES = ["/orders", "/invoices", "/packing", "/reports"];
@@ -183,6 +184,22 @@ export async function getOrderDetail(id: string, companyId: string | null) {
     createdByName: order.createdBy ? (names.get(order.createdBy) ?? null) : null,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
+    // ── Optional PI parties & signature (§7.12) ──
+    consigneeName: order.consigneeName,
+    consigneeAddress: order.consigneeAddress,
+    consigneeCountry: order.consigneeCountry,
+    consigneePhone: order.consigneePhone,
+    consigneeEmail: order.consigneeEmail,
+    notifyName: order.notifyName,
+    notifyAddress: order.notifyAddress,
+    notifyCountry: order.notifyCountry,
+    notifyPhone: order.notifyPhone,
+    notifyContactPerson: order.notifyContactPerson,
+    orderingName: order.orderingName,
+    orderingAddress: order.orderingAddress,
+    orderingCountry: order.orderingCountry,
+    orderingPhone: order.orderingPhone,
+    signatureId: order.signatureId,
     items,
     invoices: invoiceRows,
     activeInvoice: invoiceRows.find((i) => i.status !== "cancelled") ?? null,
@@ -208,9 +225,27 @@ export async function lockOrder(tx: Transaction, id: string, companyId: string, 
 /** Customer, products and bank account must exist and belong to the company. */
 export const assertOrderRefs = (companyId: string, input: DocumentInput) => assertDocumentRefs(companyId, input);
 
-/** Header columns shared by PI create + update (C&F total and section toggles included). */
-export function orderHeaderValues(input: DocumentInput) {
-  return documentHeaderValues(input);
+/** Header columns shared by PI create + update (C&F total, section toggles, and optional party fields). */
+export function orderHeaderValues(input: DocumentInput & Partial<PartyFieldsInput>) {
+  return {
+    ...documentHeaderValues(input),
+    // ── Optional PI parties & signature (all null if not provided) ──
+    consigneeName: emptyToNull(input.consigneeName),
+    consigneeAddress: emptyToNull(input.consigneeAddress),
+    consigneeCountry: emptyToNull(input.consigneeCountry),
+    consigneePhone: emptyToNull(input.consigneePhone),
+    consigneeEmail: emptyToNull(input.consigneeEmail),
+    notifyName: emptyToNull(input.notifyName),
+    notifyAddress: emptyToNull(input.notifyAddress),
+    notifyCountry: emptyToNull(input.notifyCountry),
+    notifyPhone: emptyToNull(input.notifyPhone),
+    notifyContactPerson: emptyToNull(input.notifyContactPerson),
+    orderingName: emptyToNull(input.orderingName),
+    orderingAddress: emptyToNull(input.orderingAddress),
+    orderingCountry: emptyToNull(input.orderingCountry),
+    orderingPhone: emptyToNull(input.orderingPhone),
+    signatureId: emptyToNull(input.signatureId),
+  };
 }
 
 export async function insertOrderItems(tx: Transaction, orderId: string, items: DocumentInput["items"]) {

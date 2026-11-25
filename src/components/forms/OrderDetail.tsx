@@ -11,6 +11,7 @@ import {
   FileCheck2,
   FileText,
   Lock,
+  PenTool,
   Pencil,
   Receipt,
   Send,
@@ -31,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCompany } from "@/hooks/use-company";
 import { usePermissions } from "@/hooks/use-permissions";
-import { confirmAction, confirmDanger, showError } from "@/lib/alerts";
+import { confirmAction, confirmDanger, confirmInfo, showError } from "@/lib/alerts";
 import { api, errorMessage } from "@/lib/api-client";
 import { cnfTotalLabel, SHIPPING_MODE, TOTAL_LABELS } from "@/lib/constants";
 import { formatDate, formatDateTime, formatUsd, monYY } from "@/lib/format";
@@ -166,6 +167,24 @@ export function OrderDetail({ id }: { id: string }) {
           key="confirm"
           disabled={busy}
           onClick={async () => {
+            // Check which optional party/signature details are missing
+            const missing: string[] = [];
+            if (!o.consigneeName) missing.push("Consignee");
+            if (!o.notifyName && !o.notifyContactPerson) missing.push("Notify party");
+            if (!o.signatureId) missing.push("E-signature");
+
+            // Non-blocking info warning if anything is missing
+            if (missing.length > 0) {
+              const proceed = await confirmInfo({
+                title: "Some details aren't filled in yet",
+                html:
+                  `<p style="margin-bottom:8px">The following haven't been added to this proforma invoice:</p>` +
+                  `<ul style="text-align:left;margin:0 auto;display:inline-block">${missing.map((m) => `<li>• ${m}</li>`).join("")}</ul>` +
+                  `<p style="margin-top:8px;font-size:0.85em;color:#64748B">They'll auto-populate from the customer record or latest invoice when the commercial invoice is created.</p>`,
+              });
+              if (!proceed) return;
+            }
+
             if (
               await confirmAction({
                 title: `Customer confirmed ${o.orderNumber}?`,
@@ -537,7 +556,85 @@ export function OrderDetail({ id }: { id: string }) {
         </SectionCard>
       </div>
 
+      <PartySection order={o} />
+
       <RevisionHistory documentType="proforma_invoice" documentId={o.id} />
+    </div>
+  );
+}
+
+/** Read-only display of optional party & signature fields pre-filled on this PI. */
+function PartySection({ order: o }: { order: Order }) {
+  const hasConsignee = o.consigneeName || o.consigneeAddress || o.consigneeCountry || o.consigneePhone || o.consigneeEmail;
+  const hasNotify = o.notifyName || o.notifyAddress || o.notifyCountry || o.notifyPhone || o.notifyContactPerson;
+  const hasOrdering = o.orderingName || o.orderingAddress || o.orderingCountry || o.orderingPhone;
+  const hasSignature = !!o.signatureId;
+
+  if (!hasConsignee && !hasNotify && !hasOrdering && !hasSignature) return null;
+
+  return (
+    <Card className="border-dashed">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <PenTool className="size-4 text-primary" />
+          Parties &amp; signature
+          <span className="text-xs font-normal text-text-muted">(pre-filled for the invoice)</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-6 lg:grid-cols-3">
+          {hasConsignee && (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">Consignee</h4>
+              <dl className="space-y-1.5 text-sm">
+                {o.consigneeName && <PartyRow label="Name" value={o.consigneeName} />}
+                {o.consigneeAddress && <PartyRow label="Address" value={o.consigneeAddress} />}
+                {o.consigneeCountry && <PartyRow label="Country" value={o.consigneeCountry} />}
+                {o.consigneePhone && <PartyRow label="Phone" value={o.consigneePhone} />}
+                {o.consigneeEmail && <PartyRow label="Email" value={o.consigneeEmail} />}
+              </dl>
+            </div>
+          )}
+          {hasNotify && (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">Notify party</h4>
+              <dl className="space-y-1.5 text-sm">
+                {o.notifyName && <PartyRow label="Name" value={o.notifyName} />}
+                {o.notifyContactPerson && <PartyRow label="Contact" value={o.notifyContactPerson} />}
+                {o.notifyAddress && <PartyRow label="Address" value={o.notifyAddress} />}
+                {o.notifyCountry && <PartyRow label="Country" value={o.notifyCountry} />}
+                {o.notifyPhone && <PartyRow label="Phone" value={o.notifyPhone} />}
+              </dl>
+            </div>
+          )}
+          {hasOrdering && (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">Ordering party</h4>
+              <dl className="space-y-1.5 text-sm">
+                {o.orderingName && <PartyRow label="Name" value={o.orderingName} />}
+                {o.orderingAddress && <PartyRow label="Address" value={o.orderingAddress} />}
+                {o.orderingCountry && <PartyRow label="Country" value={o.orderingCountry} />}
+                {o.orderingPhone && <PartyRow label="Phone" value={o.orderingPhone} />}
+              </dl>
+            </div>
+          )}
+        </div>
+        {hasSignature && (
+          <div className="mt-4 border-t pt-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-secondary">E-signature</span>
+            <p className="mt-1 text-sm text-text-secondary">Signature selected — will be printed on the invoice.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PartyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="w-16 shrink-0 text-xs font-medium text-text-secondary">{label}</dt>
+      <dd className="whitespace-pre-wrap">{value}</dd>
     </div>
   );
 }

@@ -349,6 +349,22 @@ export interface OrderDetail {
   showGenericName: boolean;
   bankDetailId: string | null;
   bank: BankSummary | null;
+  // Optional PI parties & signature (carried to CI at finalize)
+  consigneeName: string | null;
+  consigneeAddress: string | null;
+  consigneeCountry: string | null;
+  consigneePhone: string | null;
+  consigneeEmail: string | null;
+  notifyName: string | null;
+  notifyAddress: string | null;
+  notifyCountry: string | null;
+  notifyPhone: string | null;
+  notifyContactPerson: string | null;
+  orderingName: string | null;
+  orderingAddress: string | null;
+  orderingCountry: string | null;
+  orderingPhone: string | null;
+  signatureId: string | null;
   rejectionReason: string | null;
   rejectedAt: string | null;
   rejectedByName: string | null;

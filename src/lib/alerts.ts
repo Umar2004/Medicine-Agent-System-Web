@@ -70,6 +70,29 @@ export function showWarning(message: string, title = "Please check"): void {
   void Swal.fire({ ...base, icon: "warning", title, text: message, confirmButtonColor: colors.primary });
 }
 
+/** Non-blocking info dialog with two buttons. Returns true when the user clicks "Continue anyway". */
+export async function confirmInfo(options: {
+  title: string;
+  html: string;
+  confirmText?: string;
+  cancelText?: string;
+}): Promise<boolean> {
+  const { colors, base } = themed();
+  const result = await Swal.fire({
+    ...base,
+    icon: "info",
+    title: options.title,
+    html: options.html,
+    showCancelButton: true,
+    confirmButtonText: options.confirmText ?? "Continue anyway",
+    cancelButtonText: options.cancelText ?? "Go back and add",
+    confirmButtonColor: colors.primary,
+    cancelButtonColor: colors.neutral,
+    reverseButtons: true,
+  });
+  return result.isConfirmed;
+}
+
 /** Asks for a required reason (e.g. rejection, cancellation). Returns null when dismissed. */
 export async function promptReason(options: {
   title: string;

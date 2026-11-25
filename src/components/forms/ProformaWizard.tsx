@@ -42,6 +42,22 @@ function toExisting(o: OrderDetail): ExistingDocument {
       showFreight: o.showFreight,
       showBankDetails: o.showBankDetails,
       showOtherDetails: o.showOtherDetails,
+      // Party & signature fields (optional on PI)
+      consigneeName: o.consigneeName ?? "",
+      consigneeAddress: o.consigneeAddress ?? "",
+      consigneeCountry: o.consigneeCountry ?? "",
+      consigneePhone: o.consigneePhone ?? "",
+      consigneeEmail: o.consigneeEmail ?? "",
+      notifyName: o.notifyName ?? "",
+      notifyAddress: o.notifyAddress ?? "",
+      notifyCountry: o.notifyCountry ?? "",
+      notifyPhone: o.notifyPhone ?? "",
+      notifyContactPerson: o.notifyContactPerson ?? "",
+      orderingName: o.orderingName ?? "",
+      orderingAddress: o.orderingAddress ?? "",
+      orderingCountry: o.orderingCountry ?? "",
+      orderingPhone: o.orderingPhone ?? "",
+      signatureId: o.signatureId ?? "",
     },
   };
 }

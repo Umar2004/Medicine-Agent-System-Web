@@ -156,14 +156,23 @@ export async function createInvoiceFromOrder(
       bankDetailId: order.bankDetailId,
       notes: order.notes,
       sectionEnforcement: sectionEnforcementFor(order),
-      // Consignee defaults to the customer record; all parties stay editable while draft.
-      consigneeName: customer.businessName || customer.name,
-      consigneeAddress: [customer.address, customer.city].filter(Boolean).join(", ") || null,
-      consigneeCountry: customer.country,
-      consigneePhone: customer.phone,
-      consigneeEmail: customer.email,
-      // Notify / ordering from the customer's last issued invoice (see defaultParties).
-      ...parties,
+      // Consignee: PI fields win if filled, else fall back to the customer record.
+      consigneeName: order.consigneeName ?? customer.businessName ?? customer.name,
+      consigneeAddress: order.consigneeAddress ?? ([customer.address, customer.city].filter(Boolean).join(", ") || null),
+      consigneeCountry: order.consigneeCountry ?? customer.country,
+      consigneePhone: order.consigneePhone ?? customer.phone,
+      consigneeEmail: order.consigneeEmail ?? customer.email,
+      // Notify / ordering / signature: PI fields win if filled, else defaultParties.
+      notifyName: order.notifyName ?? parties.notifyName ?? null,
+      notifyAddress: order.notifyAddress ?? parties.notifyAddress ?? null,
+      notifyCountry: order.notifyCountry ?? parties.notifyCountry ?? null,
+      notifyPhone: order.notifyPhone ?? parties.notifyPhone ?? null,
+      notifyContactPerson: order.notifyContactPerson ?? parties.notifyContactPerson ?? null,
+      orderingName: order.orderingName ?? parties.orderingName ?? null,
+      orderingAddress: order.orderingAddress ?? parties.orderingAddress ?? null,
+      orderingCountry: order.orderingCountry ?? parties.orderingCountry ?? null,
+      orderingPhone: order.orderingPhone ?? parties.orderingPhone ?? null,
+      signatureId: order.signatureId ?? null,
       createdBy,
     })
     .returning({ id: invoices.id, invoiceNumber: invoices.invoiceNumber, sectionEnforcement: invoices.sectionEnforcement });

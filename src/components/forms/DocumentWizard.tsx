@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { SignaturePicker } from "@/components/forms/SignaturePicker";
 import { useCompany } from "@/hooks/use-company";
 import { showError } from "@/lib/alerts";
 import { api, errorMessage } from "@/lib/api-client";
@@ -27,7 +28,7 @@ import { formatUsd, monYY } from "@/lib/format";
 import { lineTotalCents, toCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { cnfTotalLabel, SHIPPING_MODE, TOTAL_LABELS } from "@/lib/constants";
-import { createProformaSchema } from "@/lib/validations/orders";
+import { createProformaSchema, type PartyFieldsInput } from "@/lib/validations/orders";
 import { createQuotationSchema, type QuotationCreateInput } from "@/lib/validations/quotations";
 import type { BankAccount, Customer, Product, ProductOption } from "@/types/entities";
 
@@ -94,9 +95,28 @@ export interface ExistingDocument {
   companyName: string;
   status: string;
   revisionNumber: number;
-  values: DocumentFormValues;
+  values: DocumentFormValues & Partial<PartyFieldsInput>;
   products: ProductOption[];
 }
+
+/** Default empty values for party/signature fields (PI only). */
+const BLANK_PARTIES: PartyFieldsInput = {
+  consigneeName: "",
+  consigneeAddress: "",
+  consigneeCountry: "",
+  consigneePhone: "",
+  consigneeEmail: "",
+  notifyName: "",
+  notifyAddress: "",
+  notifyCountry: "",
+  notifyPhone: "",
+  notifyContactPerson: "",
+  orderingName: "",
+  orderingAddress: "",
+  orderingCountry: "",
+  orderingPhone: "",
+  signatureId: "",
+};
 
 function blankValues(sectionsOn: boolean): DocumentFormValues {
   return {
@@ -115,6 +135,7 @@ function blankValues(sectionsOn: boolean): DocumentFormValues {
     showFreight: sectionsOn,
     showBankDetails: sectionsOn,
     showOtherDetails: sectionsOn,
+    ...BLANK_PARTIES,
   };
 }
 
@@ -508,6 +529,159 @@ export function DocumentWizard({ mode, existing }: { mode: DocumentMode; existin
                     </FormField>
                   </div>,
                 )}
+
+                {/* Party & signature fields — optional on PIs, hidden for quotations */}
+                {mode === "proforma" && (
+                  <Card className="border-dashed">
+                    <CardHeader className="px-4 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Parties &amp; signature{" "}
+                        <span className="font-normal text-text-muted">(optional)</span>
+                      </CardTitle>
+                      <p className="text-xs text-text-muted">
+                        Pre-fill consignee, notify party and signature here so they carry over to the
+                        commercial invoice. Any field left blank will auto-populate from the customer
+                        record or the latest invoice at finalize.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-6 px-4 pb-4">
+                      {/* Consignee */}
+                      <fieldset className="space-y-3">
+                        <legend className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+                          Consignee
+                        </legend>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <FormField label="Name" htmlFor="consigneeName">
+                            <Input
+                              id="consigneeName"
+                              placeholder="Company / person name"
+                              {...register("consigneeName" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Country" htmlFor="consigneeCountry">
+                            <Input
+                              id="consigneeCountry"
+                              placeholder="e.g. Kenya"
+                              {...register("consigneeCountry" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Address" htmlFor="consigneeAddress" className="md:col-span-2">
+                            <Textarea
+                              id="consigneeAddress"
+                              rows={2}
+                              {...register("consigneeAddress" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Phone" htmlFor="consigneePhone">
+                            <Input
+                              id="consigneePhone"
+                              {...register("consigneePhone" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Email" htmlFor="consigneeEmail">
+                            <Input
+                              id="consigneeEmail"
+                              type="email"
+                              {...register("consigneeEmail" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                        </div>
+                      </fieldset>
+
+                      {/* Notify party */}
+                      <fieldset className="space-y-3">
+                        <legend className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+                          Notify party
+                        </legend>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <FormField label="Name" htmlFor="notifyName">
+                            <Input
+                              id="notifyName"
+                              {...register("notifyName" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Contact person" htmlFor="notifyContactPerson">
+                            <Input
+                              id="notifyContactPerson"
+                              {...register("notifyContactPerson" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Address" htmlFor="notifyAddress" className="md:col-span-2">
+                            <Textarea
+                              id="notifyAddress"
+                              rows={2}
+                              {...register("notifyAddress" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Country" htmlFor="notifyCountry">
+                            <Input
+                              id="notifyCountry"
+                              {...register("notifyCountry" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Phone" htmlFor="notifyPhone">
+                            <Input
+                              id="notifyPhone"
+                              {...register("notifyPhone" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                        </div>
+                      </fieldset>
+
+                      {/* Ordering party */}
+                      <fieldset className="space-y-3">
+                        <legend className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+                          Ordering party
+                        </legend>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <FormField label="Name" htmlFor="orderingName">
+                            <Input
+                              id="orderingName"
+                              {...register("orderingName" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Country" htmlFor="orderingCountry">
+                            <Input
+                              id="orderingCountry"
+                              {...register("orderingCountry" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Address" htmlFor="orderingAddress" className="md:col-span-2">
+                            <Textarea
+                              id="orderingAddress"
+                              rows={2}
+                              {...register("orderingAddress" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                          <FormField label="Phone" htmlFor="orderingPhone">
+                            <Input
+                              id="orderingPhone"
+                              {...register("orderingPhone" as FieldPath<DocumentFormValues>)}
+                            />
+                          </FormField>
+                        </div>
+                      </fieldset>
+
+                      {/* Signature */}
+                      <fieldset className="space-y-3">
+                        <legend className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+                          Signature
+                        </legend>
+                        <Controller
+                          control={control}
+                          name={"signatureId" as FieldPath<DocumentFormValues>}
+                          render={({ field }) => (
+                            <SignaturePicker
+                              value={(field.value as string) ?? ""}
+                              onChange={field.onChange}
+                            />
+                          )}
+                        />
+                      </fieldset>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Totals goodsCents={goodsCents} values={values} cnfCents={cnfCents} className="ml-auto max-w-sm" />
               </div>
             )}

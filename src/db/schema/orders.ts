@@ -17,6 +17,7 @@ import { companies } from "./companies";
 import { customers } from "./customers";
 import { products } from "./products";
 import { quotations } from "./quotations";
+import { signatures } from "./signatures";
 import { users } from "./users";
 
 const money = (name: string) => numeric(name, { precision: 18, scale: 2 });
@@ -49,6 +50,22 @@ export const orders = appSchema.table(
     marks: text("marks"),
     paymentTerms: text("payment_terms"),
     notes: text("notes"),
+    // ── Optional PI parties & signature (carried to CI at finalize; §7.12) ──
+    consigneeName: text("consignee_name"),
+    consigneeAddress: text("consignee_address"),
+    consigneeCountry: text("consignee_country"),
+    consigneePhone: text("consignee_phone"),
+    consigneeEmail: text("consignee_email"),
+    notifyName: text("notify_name"),
+    notifyAddress: text("notify_address"),
+    notifyCountry: text("notify_country"),
+    notifyPhone: text("notify_phone"),
+    notifyContactPerson: text("notify_contact_person"),
+    orderingName: text("ordering_name"),
+    orderingAddress: text("ordering_address"),
+    orderingCountry: text("ordering_country"),
+    orderingPhone: text("ordering_phone"),
+    signatureId: uuid("signature_id").references(() => signatures.id),
     bankDetailId: uuid("bank_detail_id").references(() => companyBankDetails.id, { onDelete: "set null" }),
     rejectionReason: text("rejection_reason"),
     rejectedBy: uuid("rejected_by").references(() => users.id),
