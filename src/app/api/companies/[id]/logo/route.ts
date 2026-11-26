@@ -6,6 +6,7 @@ import { errors, handler, ok, requireUuid } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
 import { requireAuth, type SessionUser } from "@/lib/auth";
 import { findCompany } from "@/lib/companies";
+import { invalidateCompanyCache } from "@/lib/company-context";
 import { ACTION_TYPES } from "@/lib/constants";
 import { requireOwner } from "@/lib/permissions";
 import { getRequestMeta } from "@/lib/request-meta";
@@ -32,6 +33,7 @@ async function removeOwnFile(ref: string | null): Promise<void> {
 
 async function setLogo(req: NextRequest, user: SessionUser, id: string, logoUrl: string | null, previous: string | null) {
   await db.update(companies).set({ logoUrl, updatedAt: new Date() }).where(eq(companies.id, id));
+  invalidateCompanyCache();
   await removeOwnFile(previous);
   auditLog({
     user,

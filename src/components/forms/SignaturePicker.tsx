@@ -81,7 +81,8 @@ export function SignaturePicker({
             <button
               type="button"
               disabled={disabled || !onChange}
-              onClick={() => onChange?.(value === sig.id ? "" : sig.id)}
+              // Selecting only — never toggles off: a double-click used to select then silently clear it.
+              onClick={() => onChange?.(sig.id)}
               className="flex flex-1 items-center gap-3 text-left"
               aria-pressed={onChange ? value === sig.id : undefined}
             >
@@ -115,6 +116,16 @@ export function SignaturePicker({
         ))}
         {list.data?.length === 0 && <p className="text-sm text-text-secondary">You have no signatures for this company yet.</p>}
       </div>
+      {onChange && value && !disabled && (
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-text-secondary">
+            Selected: <span className="font-medium text-foreground">{list.data?.find((s) => s.id === value)?.label ?? "signature"}</span>
+          </span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")}>
+            Clear selection
+          </Button>
+        </div>
+      )}
 
       {!disabled && (
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed p-3">

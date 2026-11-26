@@ -7,7 +7,7 @@ import { requireAuth } from "@/lib/auth";
 import { getCompanyProfile } from "@/lib/company-profile";
 import { resolveCompany } from "@/lib/company-context";
 import { getPackingList, PACKING_READ_ROUTES } from "@/lib/packing-lists";
-import { pdfResponse, renderPdf } from "@/lib/pdf";
+import { documentPdfResponse } from "@/lib/pdf";
 import { requireAnyModule } from "@/lib/permissions";
 import { getRequestMeta } from "@/lib/request-meta";
 
@@ -20,17 +20,20 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
 
   const pl = await getPackingList(id, companyId);
   if (!pl) throw errors.notFound("Packing list");
-  const [inv] = await db
-    .select({
-      name: invoices.consigneeName,
-      address: invoices.consigneeAddress,
-      country: invoices.consigneeCountry,
-    })
-    .from(invoices)
-    .where(eq(invoices.id, pl.invoiceId));
-  const company = await getCompanyProfile(pl.companyId);
+  const [[inv], company] = await Promise.all([
+    db
+      .select({
+        name: invoices.consigneeName,
+        address: invoices.consigneeAddress,
+        country: invoices.consigneeCountry,
+      })
+      .from(invoices)
+      .where(eq(invoices.id, pl.invoiceId)),
+    getCompanyProfile(pl.companyId),
+  ]);
 
-  const pdf = await renderPdf(
+  return documentPdfResponse(
+    req,
     createElement(PackingList, {
       company,
       data: {
@@ -47,7 +50,6 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
         items: pl.items,
       },
     }),
-    { footerLabel: `Packing list · Invoice ${pl.invoiceNumber} · ${company.name}` },
+    { footerLabel: `Packing list · Invoice ${pl.invoiceNumber} · ${company.name}`, filename: `PackingList-${pl.invoiceNumber}.pdf` },
   );
-  return pdfResponse(pdf, `PackingList-${pl.invoiceNumber}.pdf`, req.nextUrl.searchParams.get("download") === "1");
 });

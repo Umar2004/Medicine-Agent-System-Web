@@ -365,6 +365,8 @@ export interface OrderDetail {
   orderingCountry: string | null;
   orderingPhone: string | null;
   signatureId: string | null;
+  /** The selected e-signature (label only; the image is loaded by the PDF routes). */
+  signature: { id: string; label: string } | null;
   rejectionReason: string | null;
   rejectedAt: string | null;
   rejectedByName: string | null;

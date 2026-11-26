@@ -13,6 +13,7 @@ import {
   productBatches,
   products,
   quotations,
+  signatures,
   type Transaction,
 } from "@/db";
 import { errors } from "@/lib/api";
@@ -95,7 +96,7 @@ export async function getOrderDetail(id: string, companyId: string | null) {
     .limit(1);
   if (!order) return null;
 
-  const [[customer], [company], bank, items, invoiceRows, sourceQuotation, names] = await Promise.all([
+  const [[customer], [company], bank, items, invoiceRows, sourceQuotation, names, signature] = await Promise.all([
     db.select(customerSummaryColumns).from(customers).where(eq(customers.id, order.customerId)),
     db.select({ id: companies.id, name: companies.name }).from(companies).where(eq(companies.id, order.companyId)),
     getBankSummary(order.bankDetailId),
@@ -146,6 +147,13 @@ export async function getOrderDetail(id: string, companyId: string | null) {
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
     userNames([order.createdBy, order.approvedBy, order.rejectedBy]),
+    order.signatureId
+      ? db
+          .select({ id: signatures.id, label: signatures.label })
+          .from(signatures)
+          .where(eq(signatures.id, order.signatureId))
+          .then((r) => r[0] ?? null)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -200,6 +208,7 @@ export async function getOrderDetail(id: string, companyId: string | null) {
     orderingCountry: order.orderingCountry,
     orderingPhone: order.orderingPhone,
     signatureId: order.signatureId,
+    signature,
     items,
     invoices: invoiceRows,
     activeInvoice: invoiceRows.find((i) => i.status !== "cancelled") ?? null,
@@ -220,6 +229,42 @@ export async function lockOrder(tx: Transaction, id: string, companyId: string, 
     throw errors.conflict(`Not allowed while the order is ${order.status.replace("_", " ")}.`);
   }
   return order;
+}
+
+/**
+ * Simple status change (send, confirm) as ONE statement: lock + check + update in a single UPDATE … FROM a
+ * FOR UPDATE CTE. Same guarantees as lockOrder in a transaction, but one DB round trip instead of four
+ * (BEGIN / SELECT … FOR UPDATE / UPDATE / COMMIT) — each costs ~300ms to the Seoul DB.
+ * Returns the status/revision the order had before; throws notFound/conflict like lockOrder.
+ */
+export async function transitionOrder(
+  id: string,
+  companyId: string,
+  allowed: OrderStatus[],
+  values: Partial<typeof orders.$inferInsert>,
+  exec: Pick<typeof db, "select" | "$with" | "with"> = db,
+): Promise<{ from: OrderStatus; revisionNumber: number | null }> {
+  const scope = and(eq(orders.id, id), eq(orders.companyId, companyId), eq(orders.isDeleted, false));
+  const prev = exec.$with("prev").as(
+    exec
+      .select({ prevId: orders.id, prevStatus: orders.status, prevRevision: orders.revisionNumber })
+      .from(orders)
+      .where(and(scope, inArray(orders.status, allowed)))
+      .for("update"),
+  );
+  const [row] = await exec
+    .with(prev)
+    .update(orders)
+    .set(values)
+    .from(prev)
+    .where(eq(orders.id, prev.prevId))
+    .returning({ from: prev.prevStatus, revisionNumber: prev.prevRevision });
+  if (row) return row;
+
+  // Nothing updated — say why (only on the failure path, so it costs nothing normally).
+  const [current] = await exec.select({ status: orders.status }).from(orders).where(scope).limit(1);
+  if (!current) throw errors.notFound("Order");
+  throw errors.conflict(`Not allowed while the order is ${current.status.replace("_", " ")}.`);
 }
 
 /** Customer, products and bank account must exist and belong to the company. */

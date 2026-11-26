@@ -52,6 +52,8 @@ export interface CommercialInvoiceData {
   showGenericName: boolean;
   bank: BankBlock | null;
   signature: { label: string; dataUri: string | null } | null;
+  /** Overrides the status watermark (the pre-invoice preview prints "PREVIEW"). */
+  watermark?: string;
 }
 
 /**
@@ -77,11 +79,12 @@ export function CommercialInvoice({
   const goods = data.items.reduce((s, i) => s + i.lineTotal, 0);
   const charges = data.airFreight + data.handlingDocumentation;
   const watermark =
-    data.status === "draft"
+    data.watermark ??
+    (data.status === "draft"
       ? "DRAFT"
       : data.status === "cancelled"
         ? "CANCELLED"
-        : null;
+        : null);
   return (
     <PdfDocument title={`Invoice ${data.invoiceNumber}`} watermark={watermark}>
       <CompanyHeader

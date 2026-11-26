@@ -70,7 +70,7 @@ export function sectionEnforcementFor(order: {
  * notify contact person. (The consignee always comes from the customer record.)
  */
 async function defaultParties(
-  tx: Transaction,
+  tx: Pick<Transaction, "select">,
   companyId: string,
   customer: typeof customers.$inferSelect,
 ): Promise<Partial<typeof invoices.$inferInsert>> {
@@ -100,6 +100,35 @@ async function defaultParties(
     .limit(1);
   if (last) return last;
   return customer.contactPerson ? { notifyContactPerson: customer.contactPerson } : {};
+}
+
+/**
+ * Consignee / notify / ordering parties a CI gets from its PI (§7.12): PI fields win where filled; otherwise the
+ * consignee comes from the customer record and notify/ordering from the customer's latest issued invoice.
+ * Shared by finalize and the pre-invoice preview PDF so both show the same parties.
+ */
+export async function invoicePartiesForOrder(
+  exec: Pick<Transaction, "select">,
+  order: typeof orders.$inferSelect,
+  customer: typeof customers.$inferSelect,
+) {
+  const parties = await defaultParties(exec, order.companyId, customer);
+  return {
+    consigneeName: order.consigneeName ?? customer.businessName ?? customer.name,
+    consigneeAddress: order.consigneeAddress ?? ([customer.address, customer.city].filter(Boolean).join(", ") || null),
+    consigneeCountry: order.consigneeCountry ?? customer.country,
+    consigneePhone: order.consigneePhone ?? customer.phone,
+    consigneeEmail: order.consigneeEmail ?? customer.email,
+    notifyName: order.notifyName ?? parties.notifyName ?? null,
+    notifyAddress: order.notifyAddress ?? parties.notifyAddress ?? null,
+    notifyCountry: order.notifyCountry ?? parties.notifyCountry ?? null,
+    notifyPhone: order.notifyPhone ?? parties.notifyPhone ?? null,
+    notifyContactPerson: order.notifyContactPerson ?? parties.notifyContactPerson ?? null,
+    orderingName: order.orderingName ?? parties.orderingName ?? null,
+    orderingAddress: order.orderingAddress ?? parties.orderingAddress ?? null,
+    orderingCountry: order.orderingCountry ?? parties.orderingCountry ?? null,
+    orderingPhone: order.orderingPhone ?? parties.orderingPhone ?? null,
+  };
 }
 
 /**
@@ -136,7 +165,7 @@ export async function createInvoiceFromOrder(
   const totalCents = itemsCents + toCents(order.airFreight) + toCents(order.handlingDocumentation);
 
   const invoiceNumber = await nextInvoiceNumber(tx, order.companyId, customer.code);
-  const parties = await defaultParties(tx, order.companyId, customer);
+  const parties = await invoicePartiesForOrder(tx, order, customer);
   const [invoice] = await tx
     .insert(invoices)
     .values({
@@ -156,22 +185,7 @@ export async function createInvoiceFromOrder(
       bankDetailId: order.bankDetailId,
       notes: order.notes,
       sectionEnforcement: sectionEnforcementFor(order),
-      // Consignee: PI fields win if filled, else fall back to the customer record.
-      consigneeName: order.consigneeName ?? customer.businessName ?? customer.name,
-      consigneeAddress: order.consigneeAddress ?? ([customer.address, customer.city].filter(Boolean).join(", ") || null),
-      consigneeCountry: order.consigneeCountry ?? customer.country,
-      consigneePhone: order.consigneePhone ?? customer.phone,
-      consigneeEmail: order.consigneeEmail ?? customer.email,
-      // Notify / ordering / signature: PI fields win if filled, else defaultParties.
-      notifyName: order.notifyName ?? parties.notifyName ?? null,
-      notifyAddress: order.notifyAddress ?? parties.notifyAddress ?? null,
-      notifyCountry: order.notifyCountry ?? parties.notifyCountry ?? null,
-      notifyPhone: order.notifyPhone ?? parties.notifyPhone ?? null,
-      notifyContactPerson: order.notifyContactPerson ?? parties.notifyContactPerson ?? null,
-      orderingName: order.orderingName ?? parties.orderingName ?? null,
-      orderingAddress: order.orderingAddress ?? parties.orderingAddress ?? null,
-      orderingCountry: order.orderingCountry ?? parties.orderingCountry ?? null,
-      orderingPhone: order.orderingPhone ?? parties.orderingPhone ?? null,
+      ...parties,
       signatureId: order.signatureId ?? null,
       createdBy,
     })

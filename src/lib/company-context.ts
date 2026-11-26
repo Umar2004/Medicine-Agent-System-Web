@@ -5,6 +5,7 @@ import { companies, db, userCompanyAccess } from "@/db";
 import { errors, isUuid } from "@/lib/api";
 import { COMPANY_COOKIE, COMPANY_HEADER } from "@/lib/constants";
 import type { SessionUser } from "@/lib/jwt";
+import { invalidateCompanyProfiles } from "@/lib/company-profile";
 import { ttlCache } from "@/lib/ttl-cache";
 
 export interface CompanySummary {
@@ -20,6 +21,7 @@ const companyCache = ttlCache<CompanySummary[]>("accessible-companies", 30_000);
 
 export function invalidateCompanyCache(): void {
   companyCache.clear();
+  invalidateCompanyProfiles(); // PDF letterhead (name, address, logo)
 }
 
 /** Companies the user may access. Owner → every company. */

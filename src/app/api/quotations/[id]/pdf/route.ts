@@ -6,7 +6,7 @@ import { getCompanyProfile } from "@/lib/company-profile";
 import { resolveCompany } from "@/lib/company-context";
 import { toCents } from "@/lib/money";
 import { usdAmountInWords } from "@/lib/number-to-words";
-import { pdfResponse, renderPdf } from "@/lib/pdf";
+import { documentPdfResponse } from "@/lib/pdf";
 import { requireAnyModule } from "@/lib/permissions";
 import { getQuotationDetail, QUOTATION_READ_ROUTES } from "@/lib/quotations";
 import { getRequestMeta } from "@/lib/request-meta";
@@ -22,7 +22,8 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
   if (!q) throw errors.notFound("Quotation");
 
   const company = await getCompanyProfile(q.companyId);
-  const pdf = await renderPdf(
+  return documentPdfResponse(
+    req,
     createElement(QuotationPdf, {
       company,
       data: {
@@ -59,7 +60,6 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
         bank: q.bank,
       },
     }),
-    { landscape: true, footerLabel: `Quotation ${q.quotationNumber} · ${company.name}` },
+    { landscape: true, footerLabel: `Quotation ${q.quotationNumber} · ${company.name}`, filename: `Quotation-${q.quotationNumber}.pdf` },
   );
-  return pdfResponse(pdf, `Quotation-${q.quotationNumber}.pdf`, req.nextUrl.searchParams.get("download") === "1");
 });

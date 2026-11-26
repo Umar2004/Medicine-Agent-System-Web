@@ -7,7 +7,7 @@ import { resolveCompany } from "@/lib/company-context";
 import { toCents } from "@/lib/money";
 import { usdAmountInWords } from "@/lib/number-to-words";
 import { getOrderDetail, ORDER_READ_ROUTES } from "@/lib/orders";
-import { pdfResponse, renderPdf } from "@/lib/pdf";
+import { documentPdfResponse } from "@/lib/pdf";
 import { requireAnyModule } from "@/lib/permissions";
 import { getRequestMeta } from "@/lib/request-meta";
 
@@ -45,7 +45,8 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
   }
 
   const company = await getCompanyProfile(order.companyId);
-  const pdf = await renderPdf(
+  return documentPdfResponse(
+    req,
     createElement(ProformaInvoice, {
       company,
       data: {
@@ -71,7 +72,6 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
         bank: order.bank,
       },
     }),
-    { landscape: true, footerLabel: `Proforma ${order.orderNumber} · ${company.name}` },
+    { landscape: true, footerLabel: `Proforma ${order.orderNumber} · ${company.name}`, filename: `Proforma-${order.orderNumber}.pdf` },
   );
-  return pdfResponse(pdf, `Proforma-${order.orderNumber}.pdf`, req.nextUrl.searchParams.get("download") === "1");
 });

@@ -16,7 +16,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // Font variables live on <html> because the base `font-sans` rule is applied to <html>.
     // suppressHydrationWarning: next-themes sets the theme class on <html> before React hydrates.
     <html lang="en" className={`${inter.variable} ${plexMono.variable}`} suppressHydrationWarning>
-      <body className="antialiased">
+      {/* suppressHydrationWarning: browser extensions (e.g. a currency converter adding
+          data-smart-converter-loaded) put attributes on <body> before React hydrates. */}
+      <body className="antialiased" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

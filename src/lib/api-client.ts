@@ -45,12 +45,16 @@ function redirectToLogin(): void {
   window.location.assign(`/login?next=${encodeURIComponent(next)}`);
 }
 
-async function request(path: string, init: RequestInit, retried = false): Promise<Response> {
-  const headers = new Headers(init.headers);
+function requestHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
   const companyId = useCompanyStore.getState().companyId;
   if (companyId) headers.set(COMPANY_HEADER, companyId);
   if (typeof window !== "undefined") headers.set("x-page", window.location.pathname);
+  return headers;
+}
 
+async function request(path: string, init: RequestInit, retried = false): Promise<Response> {
+  const headers = requestHeaders(init.headers);
   const res = await fetch(path, { ...init, headers, credentials: "same-origin" });
   const isAuthRoute = path.startsWith("/api/auth/login") || path.startsWith("/api/auth/refresh");
   if (res.status === 401 && !retried && !isAuthRoute) {
@@ -126,6 +130,15 @@ export const api = {
       a.click();
     }
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+  /**
+   * Fire-and-forget GET that warms the server (e.g. renders a PDF on hover) so the real request is fast.
+   * No auth refresh/redirect and errors are ignored — the real request handles those.
+   */
+  prefetch(path: string): void {
+    void fetch(path, { headers: requestHeaders(), credentials: "same-origin" })
+      .then((res) => res.arrayBuffer()) // read the body so the browser can cache it
+      .catch(() => undefined);
   },
   async del<T>(path: string): Promise<T> {
     return (await parse<{ data: T }>(await request(path, { method: "DELETE" }))).data;

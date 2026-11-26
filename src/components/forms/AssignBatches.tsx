@@ -25,7 +25,7 @@ import { useCompany } from "@/hooks/use-company";
 import { showError } from "@/lib/alerts";
 import { api, errorMessage } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { Batch, LowStockWarning, OrderDetail, ValidBatches } from "@/types/entities";
+import type { Batch, LowStockWarning, OrderDetail, OrderItemDetail, ValidBatches } from "@/types/entities";
 
 /**
  * Batch assignment for a confirmed PI (CLAUDE.md §7.8) — master-detail: product list on the left,
@@ -35,17 +35,19 @@ export function AssignBatches({ id }: { id: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { companyId } = useCompany();
-  const [alloc, setAlloc] = useState<Allocation>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const order = useQuery({
     queryKey: ["orders", "detail", id],
     queryFn: () => api.get<OrderDetail>(`/api/orders/${id}`),
   });
-  const lines = useMemo(
-    () => [...(order.data?.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [order.data],
-  );
+  // Editing an existing assignment: start from it, and treat the stock it holds as available again.
+  const editing = order.data?.status === "batch_assigned";
+  const { lines, initialAlloc, committed } = useMemo(() => planFromOrder(order.data), [order.data]);
+  // null = untouched → show the current assignment (editing) or nothing (first assignment).
+  const [touchedAlloc, setTouchedAlloc] = useState<Allocation | null>(null);
+  const alloc = touchedAlloc ?? initialAlloc;
+  const setAlloc = (update: (a: Allocation) => Allocation) => setTouchedAlloc((a) => update(a ?? initialAlloc));
   const productIds = useMemo(() => [...new Set(lines.map((l) => l.productId))], [lines]);
 
   // Prefetch every product's valid batches up front (instant switching on long PIs).
@@ -57,9 +59,9 @@ export function AssignBatches({ id }: { id: string }) {
   });
   const valid = useMemo(() => {
     const map = new Map<string, ValidBatches>();
-    batchQueries.forEach((q, i) => q.data && map.set(productIds[i], q.data));
+    batchQueries.forEach((q, i) => q.data && map.set(productIds[i], withCommittedStock(q.data, committed.get(productIds[i]))));
     return map;
-  }, [batchQueries, productIds]);
+  }, [batchQueries, productIds, committed]);
   const batchesOf = (productId: string): Batch[] | undefined => valid.get(productId)?.batches;
   const allLoaded = productIds.every((pid) => valid.has(pid));
 
@@ -86,7 +88,7 @@ export function AssignBatches({ id }: { id: string }) {
         })),
       }),
     onSuccess: () => {
-      toast.success("Batches assigned successfully");
+      toast.success(editing ? "Batch assignment updated — stock adjusted" : "Batches assigned successfully");
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
       void queryClient.invalidateQueries({ queryKey: ["quotations"] });
       void queryClient.invalidateQueries({ queryKey: ["batches"] });
@@ -115,7 +117,7 @@ export function AssignBatches({ id }: { id: string }) {
   if (order.isError || !order.data) return <ErrorState error={order.error} />;
   const o = order.data;
 
-  if (o.status !== "confirmed") {
+  if (o.status !== "confirmed" && o.status !== "batch_assigned") {
     return (
       <div className="space-y-4">
         {back}
@@ -155,8 +157,12 @@ export function AssignBatches({ id }: { id: string }) {
       <div>
         {back}
         <PageHeader
-          title={`Assign batches — ${o.orderNumber}`}
-          description={`${o.customer.businessName || o.customer.name} · ${lines.length} product${lines.length === 1 ? "" : "s"} · Created ${formatDate(o.createdAt)}`}
+          title={`${editing ? "Edit batches" : "Assign batches"} — ${o.orderNumber}`}
+          description={
+            editing
+              ? "Change the batches below and save. The previous assignment's stock is put back and the new batches are deducted in one step."
+              : `${o.customer.businessName || o.customer.name} · ${lines.length} product${lines.length === 1 ? "" : "s"} · Created ${formatDate(o.createdAt)}`
+          }
           action={
             <div className="flex flex-wrap items-center gap-4">
               <Button
@@ -223,4 +229,76 @@ export function AssignBatches({ id }: { id: string }) {
       />
     </div>
   );
+}
+
+/** batchId → quantity this PI currently holds, per product. */
+type Held = Map<string, { quantity: number; item: OrderItemDetail }>;
+type Committed = Map<string, Held>;
+
+/**
+ * PI lines for the page. A batch-assigned PI has one row per batch; those rows are merged back into one line per
+ * sort_order (the server maps any row id of a line to the same line), and the current split becomes the
+ * starting allocation.
+ */
+function planFromOrder(o: OrderDetail | undefined): { lines: OrderItemDetail[]; initialAlloc: Allocation; committed: Committed } {
+  const sorted = [...(o?.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  if (o?.status !== "batch_assigned") return { lines: sorted, initialAlloc: {}, committed: new Map() };
+
+  const bySort = new Map<number, OrderItemDetail>();
+  const initialAlloc: Allocation = {};
+  const committed: Committed = new Map();
+  for (const item of sorted) {
+    let line = bySort.get(item.sortOrder);
+    if (line) {
+      line.quantity += item.quantity;
+      line.totalUsd += item.totalUsd;
+    } else {
+      line = { ...item, batchId: null, batchNumber: null, batchMfd: null, batchExp: null };
+      bySort.set(item.sortOrder, line);
+    }
+    if (!item.batchId) continue;
+    const parts = (initialAlloc[line.id] ??= {});
+    parts[item.batchId] = (parts[item.batchId] ?? 0) + item.quantity;
+    const forProduct: Held = committed.get(item.productId) ?? new Map();
+    const held = forProduct.get(item.batchId);
+    forProduct.set(item.batchId, { quantity: (held?.quantity ?? 0) + item.quantity, item });
+    committed.set(item.productId, forProduct);
+  }
+  return { lines: [...bySort.values()], initialAlloc, committed };
+}
+
+/**
+ * Stock as it will be once this PI's current assignment is released: what it holds is added back, and a batch it
+ * emptied (so no longer listed as valid) is shown again. The server re-checks everything on save.
+ */
+function withCommittedStock(data: ValidBatches, held: Held | undefined): ValidBatches {
+  if (!held?.size) return data;
+  const batches: Batch[] = data.batches.map((b) => {
+    const h = held.get(b.id);
+    return h ? { ...b, stockQuantity: b.stockQuantity + h.quantity } : b;
+  });
+  for (const [batchId, { quantity, item }] of held) {
+    if (batches.some((b) => b.id === batchId)) continue;
+    batches.push({
+      id: batchId,
+      batchNumber: item.batchNumber ?? "—",
+      productId: item.productId,
+      productNumber: item.productNumber,
+      productName: item.brandName,
+      productUnit: item.unit,
+      supplierId: null,
+      supplierName: null,
+      supplierCompanyName: null,
+      mfd: item.batchMfd,
+      exp: item.batchExp,
+      stockQuantity: quantity,
+      costPrice: null,
+      priceType: null,
+      isActive: true,
+      status: "active",
+      createdAt: "",
+      updatedAt: "",
+    });
+  }
+  return { ...data, batches };
 }

@@ -1109,12 +1109,13 @@ export const ACTION_TYPES = {
 | GET/PUT/DELETE | `/api/orders/[id]` | Detail / edit PI (after sending: new revision, → `negotiating`) / delete draft PI |
 | POST | `/api/orders/[id]/send` | Mark PI as sent: `draft`/`negotiating` → `sent` |
 | POST | `/api/orders/[id]/confirm` | Customer confirmed: `sent`/`negotiating` → `confirmed` |
-| POST | `/api/orders/[id]/assign-batches` | `confirmed` → `batch_assigned`, stock deducted (lines may split across batches) |
+| POST | `/api/orders/[id]/assign-batches` | `confirmed` → `batch_assigned`, stock deducted (lines may split across batches). On a `batch_assigned` PI it **edits**: releases the current assignment and applies the new one in one transaction (`applyBatchAssignment`) |
 | POST | `/api/orders/[id]/undo-batches` | `batch_assigned` → `confirmed`, stock restored |
 | POST | `/api/orders/[id]/cancel` | Cancel PI (restores stock if `batch_assigned`) |
 | POST | `/api/orders/[id]/finalize` | `batch_assigned` → `invoiced`, document_type → `commercial_invoice`; creates a draft CI (→ `packingListCopiedFrom` when a cancelled CI's packing list was carried over) |
 | POST | `/api/orders/[id]/complete` | `invoiced` → `completed` (CI must be issued) |
 | GET | `/api/orders/[id]/pdf` | Proforma Invoice PDF |
+| GET | `/api/orders/[id]/invoice-preview` | `batch_assigned` only: the CI as it will be (batches, parties via `invoicePartiesForOrder`, bank, signature), watermarked PREVIEW; creates nothing |
 | GET | `/api/orders/next-number?customerId=` | Preview of the next PI number |
 | GET | `/api/orders/last-sale-price` | Last price for customer+product |
 

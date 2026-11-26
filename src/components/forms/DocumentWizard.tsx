@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { cnfTotalLabel, SHIPPING_MODE, TOTAL_LABELS } from "@/lib/constants";
 import { createProformaSchema, type PartyFieldsInput } from "@/lib/validations/orders";
 import { createQuotationSchema, type QuotationCreateInput } from "@/lib/validations/quotations";
-import type { BankAccount, Customer, Product, ProductOption } from "@/types/entities";
+import type { BankAccount, Customer, Product, ProductOption, Signature } from "@/types/entities";
 
 /** Form values for a quotation or PI — both schemas have the same shape. */
 export type DocumentFormValues = QuotationCreateInput;
@@ -191,6 +191,12 @@ export function DocumentWizard({ mode, existing }: { mode: DocumentMode; existin
     queryFn: () => api.list<BankAccount>("/api/bank-details", { pageSize: 200 }),
     enabled,
     staleTime: 60_000,
+  });
+  // Same cache entry as SignaturePicker — used to name the chosen signature on the Preview step.
+  const signatureList = useQuery({
+    queryKey: ["signatures", companyId],
+    queryFn: () => api.get<Signature[]>("/api/signatures"),
+    enabled: enabled && mode === "proforma",
   });
   const products = useQuery({
     queryKey: ["products", "options"],
@@ -748,6 +754,8 @@ export function DocumentWizard({ mode, existing }: { mode: DocumentMode; existin
                   </PreviewBlock>
                 </div>
 
+                {mode === "proforma" && <PartiesPreview values={values} signatures={signatureList.data} />}
+
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted text-xs text-text-secondary">
@@ -830,6 +838,41 @@ export function DocumentWizard({ mode, existing }: { mode: DocumentMode; existin
 
 function NotIncluded() {
   return <div className="text-text-muted italic">Not included</div>;
+}
+
+/** PI Preview step: parties and signature as they will be saved (blank parties are filled at finalize). */
+function PartiesPreview({ values, signatures }: { values: DocumentFormValues; signatures: Signature[] | undefined }) {
+  const v = values as DocumentFormValues & Partial<PartyFieldsInput>;
+  const party = (name?: string, ...rest: (string | undefined)[]) =>
+    name || rest.some(Boolean) ? (
+      <>
+        <div className="font-medium">{name || "—"}</div>
+        <div className="text-text-secondary">{rest.filter(Boolean).join(", ")}</div>
+      </>
+    ) : (
+      <div className="text-text-muted">Filled in when the invoice is created</div>
+    );
+  const signature = v.signatureId ? signatures?.find((s) => s.id === v.signatureId) : undefined;
+  return (
+    <div className="grid gap-4 md:grid-cols-4">
+      <PreviewBlock title="Consignee">{party(v.consigneeName, v.consigneeAddress, v.consigneeCountry)}</PreviewBlock>
+      <PreviewBlock title="Notify party">{party(v.notifyName || v.notifyContactPerson, v.notifyAddress, v.notifyCountry)}</PreviewBlock>
+      <PreviewBlock title="Ordering party">{party(v.orderingName, v.orderingAddress, v.orderingCountry)}</PreviewBlock>
+      <PreviewBlock title="E-signature">
+        {v.signatureId ? (
+          <div className="flex items-center gap-2">
+            {signature?.url && (
+              // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+              <img src={signature.url} alt="" className="max-h-10 max-w-24 rounded bg-paper object-contain" />
+            )}
+            <span className="font-medium">{signature?.label ?? "Selected"}</span>
+          </div>
+        ) : (
+          <div className="text-text-muted">None selected</div>
+        )}
+      </PreviewBlock>
+    </div>
+  );
 }
 
 function PreviewBlock({ title, children }: { title: string; children: ReactNode }) {

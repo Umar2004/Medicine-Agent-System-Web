@@ -7,7 +7,7 @@ import { resolveCompany } from "@/lib/company-context";
 import { getInvoiceDetail, INVOICE_READ_ROUTES } from "@/lib/invoices";
 import { toCents } from "@/lib/money";
 import { usdAmountInWords } from "@/lib/number-to-words";
-import { pdfResponse, renderPdf } from "@/lib/pdf";
+import { documentPdfResponse } from "@/lib/pdf";
 import { requireAnyModule } from "@/lib/permissions";
 import { getRequestMeta } from "@/lib/request-meta";
 
@@ -26,7 +26,8 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
     inv.signature ? imageDataUri(inv.signature.imageUrl) : Promise.resolve(null),
   ]);
 
-  const pdf = await renderPdf(
+  return documentPdfResponse(
+    req,
     createElement(CommercialInvoice, {
       company,
       data: {
@@ -58,7 +59,6 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
         signature: inv.signature ? { label: inv.signature.label, dataUri: signatureUri } : null,
       },
     }),
-    { landscape: true, footerLabel: `Invoice ${inv.invoiceNumber} · ${company.name}` },
+    { landscape: true, footerLabel: `Invoice ${inv.invoiceNumber} · ${company.name}`, filename: `Invoice-${inv.invoiceNumber}.pdf` },
   );
-  return pdfResponse(pdf, `Invoice-${inv.invoiceNumber}.pdf`, req.nextUrl.searchParams.get("download") === "1");
 });

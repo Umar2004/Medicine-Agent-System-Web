@@ -40,6 +40,9 @@ import type { OrderDetail as Order } from "@/types/entities";
 
 type Action = "send" | "confirm" | "undo-batches" | "cancel" | "finalize" | "complete";
 
+/** Actions that only change the status (no stock, no new documents) — shown before the server answers. */
+const OPTIMISTIC_STATUS: Partial<Record<Action, Order["status"]>> = { send: "sent", confirm: "confirmed" };
+
 export function OrderDetail({ id }: { id: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -51,15 +54,36 @@ export function OrderDetail({ id }: { id: string }) {
     queryFn: () => api.get<Order>(`/api/orders/${id}`),
   });
 
+  const detailKey = ["orders", "detail", id];
   const action = useMutation({
     mutationFn: ({ name, body }: { name: Action; body?: unknown }) =>
       api.post<Order | { id: string; invoiceNumber: string; packingListCopiedFrom: string | null }>(
         `/api/orders/${id}/${name}`,
         body ?? {},
       ),
+    // Pure status changes show instantly; rolled back if the server refuses.
+    onMutate: async ({ name }) => {
+      const optimistic = OPTIMISTIC_STATUS[name];
+      if (!optimistic) return { previous: undefined };
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previous = queryClient.getQueryData<Order>(detailKey);
+      if (previous) queryClient.setQueryData<Order>(detailKey, { ...previous, status: optimistic });
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(detailKey, ctx.previous);
+      showError(errorMessage(err), "Action failed");
+    },
     onSuccess: (result, { name }) => {
+      // The response IS the updated order — use it instead of waiting for a refetch of this page.
+      const isOrder = "items" in result && "orderNumber" in result;
+      if (isOrder) queryClient.setQueryData(detailKey, result);
       for (const key of ["orders", "batches", "products", "invoices", "revisions", "quotations"]) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
+        void queryClient.invalidateQueries({
+          queryKey: [key],
+          // Lists etc. refresh in the background; this page's detail was just set from the response.
+          predicate: (q) => !isOrder || q.queryKey.join("/") !== detailKey.join("/"),
+        });
       }
       const messages: Record<Action, string> = {
         send: "Marked as sent to the customer",
@@ -75,7 +99,6 @@ export function OrderDetail({ id }: { id: string }) {
         router.push(`/invoices/${result.id}`);
       }
     },
-    onError: (err) => showError(errorMessage(err), "Action failed"),
   });
 
   const remove = useMutation({
@@ -211,6 +234,14 @@ export function OrderDetail({ id }: { id: string }) {
       );
     }
     if (s === "batch_assigned" && can("approve_orders")) {
+      buttons.push(
+        <Button key="edit-batches" variant="outline" asChild>
+          <Link href={`/orders/${o.id}/assign-batches`}>
+            <Boxes />
+            Edit batches
+          </Link>
+        </Button>,
+      );
       buttons.push(
         <Button
           key="undo"
@@ -433,7 +464,13 @@ export function OrderDetail({ id }: { id: string }) {
               <Included label="Bank details" on={o.showBankDetails} />
               <Included label="Notes & other details" on={o.showOtherDetails} />
             </div>
-            <PdfButtons path={`/api/orders/${o.id}/pdf`} label="Proforma PDF" size="sm" />
+            <div className="flex flex-wrap gap-2">
+              <PdfButtons path={`/api/orders/${o.id}/pdf`} label="Proforma PDF" size="sm" />
+              {/* What the invoice will look like with the assigned batches — before it is created. */}
+              {s === "batch_assigned" && (
+                <PdfButtons path={`/api/orders/${o.id}/invoice-preview`} label="Invoice preview" size="sm" />
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -622,7 +659,10 @@ function PartySection({ order: o }: { order: Order }) {
         {hasSignature && (
           <div className="mt-4 border-t pt-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-secondary">E-signature</span>
-            <p className="mt-1 text-sm text-text-secondary">Signature selected — will be printed on the invoice.</p>
+            <p className="mt-1 text-sm text-text-secondary">
+              <span className="font-medium text-foreground">{o.signature?.label ?? "Selected"}</span> — will be printed on the
+              invoice.
+            </p>
           </div>
         )}
       </CardContent>
