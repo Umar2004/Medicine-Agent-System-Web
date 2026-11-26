@@ -36,7 +36,6 @@ jobs:
     name: Build & Deploy
     needs: check
     runs-on: ubuntu-latest
-    # Only deploy on push to main (not on PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -72,14 +71,14 @@ jobs:
             cd ${{ env.DEPLOY_PATH }}
 
             # Load the new image
-            docker load < image.tar.gz
+            sudo docker load < image.tar.gz
 
             # Stop the old container (if running)
-            docker stop medicine-agent-web 2>/dev/null || true
-            docker rm medicine-agent-web 2>/dev/null || true
+            sudo docker stop medicine-agent-web 2>/dev/null || true
+            sudo docker rm medicine-agent-web 2>/dev/null || true
 
             # Start new container with server-side env vars
-            docker run -d \
+            sudo docker run -d \
               --name medicine-agent-web \
               --restart always \
               -p 3000:3000 \
@@ -87,7 +86,7 @@ jobs:
               ${{ env.DOCKER_IMAGE }}:latest
 
             # Clean up
-            rm -f image.tar.gz
-            docker image prune -f
+            sudo rm -f image.tar.gz
+            sudo docker image prune -f
 
             echo "✅ Deployed successfully"
